@@ -6,18 +6,58 @@
   "engines": {
     "vscode": "^1.101.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:WolfenGames/GeneralizedTestManager.git"
+  },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "generalizedtestmanager.helloWorld",
-        "title": "Hello World"
+    "configuration": {
+      "title": "GeneralizedTestManager",
+      "properties": {
+        "gtm.folders_to_monitor": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "description": "Folder paths to monitor for test files. Use absolute paths or workspace-relative paths.",
+            "properties": {
+              "path": {
+                "type": "string",
+                "default": "",
+                "description": "The path to the folder to monitor. This can be an absolute path or a relative path from the workspace root."
+              },
+              "type": {
+                "type": "string",
+                "default": "python",
+                "enum": ["python"],
+                "description": "The type of folder. 'test' for test files, 'source' for source files. This helps in categorizing the folders."
+              },
+              "python_path": {
+                "type": "string",
+                "default": "",
+                "description": "The path to the Python executable to use for running tests in this folder. If not specified, the extension will try to find a Python executable in the folder's .venv or .env directories."
+              },
+              "test_files": {
+                "type": "array",
+                "default": [],
+                "items": {
+                  "type": "string",
+                  "description": "List of specific test files to run in this folder. If empty, all test files in the folder will be considered."
+                }
+              }
+            }
+          },
+          "description": "List of folders to monitor for test files. The extension will watch these folders for changes and update the test list accordingly."
+        }
       }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
