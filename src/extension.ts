@@ -167,8 +167,7 @@ async function runUnittest(
   });
   const lines = res.stderr.split("\n").filter((line) => line.trim() !== "");
   const status = lines.pop()?.trim() || "Unknown status";
-  console.log(`Status: ${status}`);
-  if (status !== "OK") {
+  if (!status.startsWith("OK")) {
     throw new Error(`${status}`);
   }
 }

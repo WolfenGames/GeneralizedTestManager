@@ -2,7 +2,7 @@
   "name": "generalizedtestmanager",
   "displayName": "GeneralizedTestManager",
   "description": "A central point to manage tests for a project.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.101.0"
   },
