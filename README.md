@@ -44,3 +44,7 @@ I fixed a running code issue
 
 We can collect any evidence gathered.
 Zip it aswell.
+
+### 0.0.4
+
+Version bump for consistency...
