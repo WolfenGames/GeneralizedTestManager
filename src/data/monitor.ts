@@ -22,11 +22,14 @@ class Monitor {
    */
   test_files: string[];
 
+  evidence_collector?: string[];
+
   constructor(data: Partial<Monitor> = {}) {
     this.path = data.path ?? "";
     this.type = data.type ?? "python";
     this.python_path = data.python_path ?? "";
     this.test_files = data.test_files ?? [];
+    this.evidence_collector = data.evidence_collector ?? [];
   }
 }
 

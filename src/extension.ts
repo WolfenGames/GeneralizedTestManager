@@ -4,6 +4,8 @@ import * as vscode from "vscode";
 import Monitor from "./data/monitor";
 import { exec } from "child_process";
 import * as util from "util";
+import copyFiles from "./process/evidence_collection";
+import zipFolder from "./process/zipper";
 
 const execPromise = util.promisify(exec);
 
@@ -129,10 +131,25 @@ async function runner(item: vscode.TestItem, path: string) {
   const config = vscode.workspace.getConfiguration("gtm");
   let refItems: Monitor[] = config.get("folders_to_monitor", []);
 
-  const monitorItem =
+  const monitorItemPythonPath =
     refItems.find((i) => i.path === folder)?.python_path || "";
 
-  await runUnittest(folder, monitorItem, path);
+  await runUnittest(folder, monitorItemPythonPath, path, item);
+  const evidenceLocation = config.get("evidence_location", "");
+  if (evidenceLocation==="") {
+    return;
+  }
+  const source = refItems.find((i) => i.path === folder);
+  for (const collector of source?.evidence_collector || []) {
+    const collectorPath = `${folder}${collector}`;
+    const folderName=source?.path.split("\\").pop() || source?.path
+    const dest=`${evidenceLocation}\\${folderName}`;
+    console.log(`Running evidence collector: ${collectorPath} to ${dest}`);
+    copyFiles(collectorPath, dest);
+    // get timestamp for the folder
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    zipFolder(dest, `${evidenceLocation}\\zips\\${folderName}_${timestamp}.zip`);
+  }
 }
 
 async function refreshTests(controller: vscode.TestController) {
@@ -157,18 +174,28 @@ async function refreshTests(controller: vscode.TestController) {
 async function runUnittest(
   folder: string,
   pythonPath: string,
-  file: string
+  file: string,
+  testItem: vscode.TestItem // Pass the test item to update its message
 ): Promise<void> {
-  console.log(`Running unittest in folder: ${folder} for file: ${file}`);
-  console.log(`Using Python executable: ${pythonPath}`);
   console.log(`Full command: ${folder}${pythonPath} ${file}`);
-  const res = await execPromise(`${folder}${pythonPath} ${file}`, {
-    cwd: folder,
-  });
-  const lines = res.stderr.split("\n").filter((line) => line.trim() !== "");
-  const status = lines.pop()?.trim() || "Unknown status";
-  if (!status.startsWith("OK")) {
-    throw new Error(`${status}`);
+  try {
+    const res = await execPromise(`${folder}${pythonPath} ${file}`, {
+      cwd: folder    
+    });
+
+    // Check exit code first (execPromise throws on non-zero exit codes)
+    // Only set error if there are actual test failures
+    const stdoutOutput = res.stderr.trim().split("\n").pop();
+    if (!stdoutOutput?.startsWith("OK")) {
+      testItem.error = res.stderr.trim() || stdoutOutput;
+      throw new Error(stdoutOutput || "Test failed with no output");
+    }
+  } catch (error) {
+    console.error(`Error running unittest: ${error}`);
+    if (!testItem.error) {
+      testItem.error = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
+    throw error;
   }
 }
 
