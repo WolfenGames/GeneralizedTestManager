@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(runProfile);
 }
 
-async function processTestItemArray(toRun: readonly vscode.TestItem[], run: vscode.TestRun) {
+export async function processTestItemArray(toRun: readonly vscode.TestItem[], run: vscode.TestRun) {
   let childrenToRun: vscode.TestItem[] = [];
   for (const parent of toRun) {
     run.started(parent as vscode.TestItem);
@@ -119,7 +119,7 @@ async function processTestItemCollection(toRun: vscode.TestItemCollection, run: 
   return childrenToRun;
 }
 
-async function runner(item: vscode.TestItem, path: string) {
+export async function runner(item: vscode.TestItem, path: string) {
   const parentItem = (item as vscode.TestItem).parent;
   const folder = (parentItem as vscode.TestItem).id;
   console.log(
@@ -142,7 +142,7 @@ async function runner(item: vscode.TestItem, path: string) {
   const source = refItems.find((i) => i.path === folder);
   for (const collector of source?.evidence_collector || []) {
     const collectorPath = `${folder}${collector}`;
-    const folderName=source?.path.split("\\").pop() || source?.path
+    const folderName=source?.path.split("\\").pop() || source?.path;
     const dest=`${evidenceLocation}\\${folderName}`;
     console.log(`Running evidence collector: ${collectorPath} to ${dest}`);
     copyFiles(collectorPath, dest);
@@ -152,7 +152,7 @@ async function runner(item: vscode.TestItem, path: string) {
   }
 }
 
-async function refreshTests(controller: vscode.TestController) {
+export async function refreshTests(controller: vscode.TestController) {
   const config = vscode.workspace.getConfiguration("gtm");
   let newItems: Monitor[] = config.get("folders_to_monitor", []);
   controller.items.replace([]);
@@ -171,7 +171,7 @@ async function refreshTests(controller: vscode.TestController) {
   }
 }
 
-async function runUnittest(
+export async function runUnittest(
   folder: string,
   pythonPath: string,
   file: string,
