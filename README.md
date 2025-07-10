@@ -13,12 +13,12 @@ Runs all python files/tests as configured
     {
         "path": "/some/path",
         "runners": [
-        {
-            "type": "python",
-            "executable_path": "/usr/bin/python3",
-            "test_files": ["test1.py", "test2.py"],
-            "use_python_path": true
-        }
+            {
+                "type": "python",
+                "executable_path": "/usr/bin/python3",
+                "test_files": ["test1.py", "test2.py"],
+                "use_python_path": true
+            }
         ],
         "evidence_collector": ["collector1", "collector2"],
     }
@@ -49,3 +49,7 @@ Zip it aswell.
 ### 0.0.4
 
 Version bump for consistency...
+
+### 0.1.0
+
+Added support for behave.
