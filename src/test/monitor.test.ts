@@ -1,5 +1,4 @@
 import Monitor from "../data/monitor";
-import { expect } from '@jest/globals';
 
 describe("Monitor", () => {
     it("should initialize with default values when no data is provided", () => {

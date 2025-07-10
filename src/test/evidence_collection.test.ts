@@ -1,10 +1,7 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import copyFiles from "../process/evidence_collection";
-import { expect, jest } from '@jest/globals';
-
-// Add the following import for jest types
+const fs = require("fs") as jest.Mocked<typeof import("fs")>;
+const path = require("path");
 
 jest.mock("fs");
 jest.mock("vscode", () => ({
