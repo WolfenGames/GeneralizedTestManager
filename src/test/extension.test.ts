@@ -15,10 +15,16 @@ function mockWorkspaceConfig() {
       .fn()
       .mockImplementationOnce(() => [
         {
-          path: "/my/project/",
-          test_files: ["tests/test1.py", "tests/test2.py"],
-          python_path: "/env/bin/python",
-          evidence_collector: ["/collector"],
+          path: "/some/path",
+          runners: [
+            {
+              type: "python" as const,
+              executable_path: "/usr/bin/python3",
+              test_files: ["test1.py", "test2.py"],
+              use_python_path: true
+            }
+          ],
+          evidence_collector: ["collector1", "collector2"],
         },
       ])
       .mockImplementationOnce(() => "C:\\evidence"),
@@ -99,8 +105,8 @@ describe("VSCode Extension", () => {
 
     expect(controller.items.add).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: "/my/project/",
-        label: "/my/project/",
+        id: "/some/path.python",
+        label: "/some/path (python)",
       })
     );
   });

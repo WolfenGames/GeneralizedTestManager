@@ -2,7 +2,7 @@
   "name": "generalizedtestmanager",
   "displayName": "GeneralizedTestManager",
   "description": "A central point to manage tests for a project.",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.101.0"
   },
@@ -33,35 +33,47 @@
                 "default": "",
                 "description": "The path to the folder to monitor. This can be an absolute path or a relative path from the workspace root."
               },
-              "type": {
-                "type": "string",
-                "default": "python",
-                "enum": [
-                  "python"
-                ],
-                "description": "The type of folder. 'test' for test files, 'source' for source files. This helps in categorizing the folders."
-              },
-              "python_path": {
-                "type": "string",
-                "default": "",
-                "description": "The path to the Python executable to use for running tests in this folder. If not specified, the extension will try to find a Python executable in the folder's .venv or .env directories."
-              },
-              "test_files": {
-                "type": "array",
-                "default": [],
-                "items": {
-                  "type": "string",
-                  "description": "List of specific test files to run in this folder. If empty, all test files in the folder will be considered."
-                }
-              },
-              "evidence_collector": {
-                "type": "array",
-                "default": [],
-                "items": {
-                  "type": "string",
-                  "description": "List of evidence runs you want copied to evidence_location."
+             "runners": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["python", "behave"],
+                    "default": "python",
+                    "description": "The type of runner to use for the tests."
+                  },
+                  "python_path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The path to the executable for the runner. This can be an absolute path or a relative path from the workspace root."
+                  },
+                  "test_files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": [],
+                    "description": "List of test files to run with this runner."
+                  },
+                  "evidence_collector": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": [],
+                    "description": "List of evidence collectors to use with this runner."
+                  },
+                  "use_python_path": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to use the Python path for this runner."
+                  }
                 }
               }
+             }
             }
           },
           "description": "List of folders to monitor for test files. The extension will watch these folders for changes and update the test list accordingly."

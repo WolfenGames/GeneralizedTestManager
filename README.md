@@ -11,15 +11,16 @@ Runs all python files/tests as configured
 ```json
 "gtm.folders_to_monitor": [
     {
-        "path": "..",
-        "python_path": "\\.env\\Scripts\\python.exe",
-        "type": "python",
-        "test_files": [
-            "\\tests\\local\\test.py",
+        "path": "/some/path",
+        "runners": [
+        {
+            "type": "python",
+            "executable_path": "/usr/bin/python3",
+            "test_files": ["test1.py", "test2.py"],
+            "use_python_path": true
+        }
         ],
-        "evidence_collector": [
-            "\\tests\\output"
-        ]
+        "evidence_collector": ["collector1", "collector2"],
     }
 ],
 "gtm.evidence_location": "C:\\Evidence"

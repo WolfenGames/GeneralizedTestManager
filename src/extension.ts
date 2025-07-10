@@ -6,6 +6,7 @@ import { exec } from "child_process";
 import * as util from "util";
 import copyFiles from "./process/evidence_collection";
 import zipFolder from "./process/zipper";
+import RunnerType from "./data/runner_type";
 
 const execPromise = util.promisify(exec);
 
@@ -36,15 +37,17 @@ export function activate(context: vscode.ExtensionContext) {
       let x: vscode.TestItemCollection;
       let childrenToRun: vscode.TestItem[] = [];
       if (request.include) {
+        console.log(`Running tests for included items: ${request.include}`);
         childrenToRun = await processTestItemArray(request.include, run);
       } else if (controller.items) {
+        console.log(`Running tests for controller items: ${controller.items}`);
         childrenToRun = await processTestItemCollection(controller.items, run);
       } else {
         throw new Error("No items to run");
       }
       for (const item of childrenToRun) {
         try {
-          await runner(item as vscode.TestItem, item.id);
+          await runner(item as vscode.TestItem);
           run.passed(item as vscode.TestItem);
         } catch (error) {
           console.error(`Error running test: ${error}`);
@@ -74,7 +77,10 @@ export async function processTestItemArray(toRun: readonly vscode.TestItem[], ru
       for (const [id, child] of (parent as vscode.TestItem).children) {
         run.started(child as vscode.TestItem);
         const path = (child as vscode.TestItem).id;
-        if (!path.endsWith(".py")) {
+        const splitPath= path.split(".");
+        splitPath.pop();
+        const valid=splitPath.find((p) => p === "py") || splitPath.find((p) => p === "feature");
+        if (!valid) {
           const children = (child as vscode.TestItem).children;
           for (const [childId, childItem] of children) {
             run.started(childItem as vscode.TestItem);
@@ -103,7 +109,10 @@ async function processTestItemCollection(toRun: vscode.TestItemCollection, run: 
       for (const [id, child] of (parent as vscode.TestItem).children) {
         run.started(child as vscode.TestItem);
         const path = (child as vscode.TestItem).id;
-        if (!path.endsWith(".py")) {
+        const splitPath= path.split(".");
+        splitPath.pop();
+        const valid=splitPath.find((p) => p === "py") || splitPath.find((p) => p === "feature");
+        if (!valid) {
           const children = (child as vscode.TestItem).children;
           for (const [childId, childItem] of children) {
             run.started(childItem as vscode.TestItem);
@@ -119,36 +128,74 @@ async function processTestItemCollection(toRun: vscode.TestItemCollection, run: 
   return childrenToRun;
 }
 
-export async function runner(item: vscode.TestItem, path: string) {
+export async function runner(item: vscode.TestItem) {
   const parentItem = (item as vscode.TestItem).parent;
-  const folder = (parentItem as vscode.TestItem).id;
+  const folder = (parentItem as vscode.TestItem).id.split(".")[0];
+  const projectType = (parentItem as vscode.TestItem).id.split(".")[1] || "python";
+  const config = vscode.workspace.getConfiguration("gtm");
+  let refItems: Monitor[] = config.get("folders_to_monitor", []);
+ 
   console.log(
     `Running test for item: ${
       (item as vscode.TestItem).id
-    } in folder: ${folder}`
+    } in folder: ${folder} for ${projectType}`
   );
-  // Get python_path from config
-  const config = vscode.workspace.getConfiguration("gtm");
-  let refItems: Monitor[] = config.get("folders_to_monitor", []);
 
-  const monitorItemPythonPath =
-    refItems.find((i) => i.path === folder)?.python_path || "";
+  const MonitorItemParent=refItems.find((i) => i.path === folder); 
+  if (!MonitorItemParent) {
+    throw new Error(`No monitor item found for folder: ${folder}`);
+  }
+  const EffectiveRunner = MonitorItemParent.runners.find((r) => r.type === projectType);
+  if (!EffectiveRunner) {
+    throw new Error(
+      `No runner found for type: ${projectType} in folder: ${folder}`
+    );
+  }
 
-  await runUnittest(folder, monitorItemPythonPath, path, item);
+  console.log(
+    `Effective runner for item: ${item.id} is ${EffectiveRunner.type} with path: ${MonitorItemParent.path}`
+  );
+
+  switch (EffectiveRunner.type) {
+    case "python":
+      console.log("Running python unittest");
+      await runUnittest(
+        MonitorItemParent,
+        EffectiveRunner,
+        item as vscode.TestItem // Pass the test item to update its message
+      );
+      break;
+    case "behave":
+      console.log("Running behave tests");
+      await runBehave(
+        MonitorItemParent,
+        EffectiveRunner,
+        item as vscode.TestItem // Pass the test item to update its message
+      );
+      break;
+    default:
+      throw new Error(
+        `Unsupported type: ${EffectiveRunner.type}. Only 'python' and 'behave' are supported.`
+      );
+  }
+
   const evidenceLocation = config.get("evidence_location", "");
-  if (evidenceLocation==="") {
+  if (evidenceLocation === "") {
     return;
   }
-  const source = refItems.find((i) => i.path === folder);
-  for (const collector of source?.evidence_collector || []) {
+
+  for (const collector of MonitorItemParent?.evidence_collector || []) {
     const collectorPath = `${folder}${collector}`;
-    const folderName=source?.path.split("\\").pop() || source?.path;
-    const dest=`${evidenceLocation}\\${folderName}`;
+    const folderName = MonitorItemParent?.path.split("\\").pop() || MonitorItemParent?.path;
+    const dest = `${evidenceLocation}\\${folderName}`;
     console.log(`Running evidence collector: ${collectorPath} to ${dest}`);
     copyFiles(collectorPath, dest);
     // get timestamp for the folder
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    zipFolder(dest, `${evidenceLocation}\\zips\\${folderName}_${timestamp}.zip`);
+    zipFolder(
+      dest,
+      `${evidenceLocation}\\zips\\${folderName}_${timestamp}.zip`
+    );
   }
 }
 
@@ -159,32 +206,91 @@ export async function refreshTests(controller: vscode.TestController) {
 
   for (const item of newItems) {
     const projectName = item.path.split("\\").pop() || item.path;
-    const testItem = controller.createTestItem(item.path, projectName);
-    item.test_files?.forEach((file) => {
-      const testFileItem = controller.createTestItem(
-        `${item.path}${file}`,
-        file
+    for (const runner of item.runners) {
+      const controllerItem = controller.createTestItem(
+        `${item.path}.${runner.type}`,
+        `${projectName} (${runner.type})`
       );
-      testItem.children.add(testFileItem);
+      runner.test_files?.forEach((file) => {
+        const testFileItem = controller.createTestItem(
+          `${item.path}${file}.${runner.type}`,
+          file
+        );
+        controllerItem.children.add(testFileItem);
+      });
+      controller.items.add(controllerItem);
+    }
+  }
+}
+
+export async function runBehave(
+  MonitorItemParent: Monitor,
+  EffectiveRunner: RunnerType,
+  testItem: vscode.TestItem // Pass the test item to update its message
+): Promise<void> {
+  const folder = MonitorItemParent.path;
+  const splitId = (testItem.id as string).split(".");
+  splitId.pop(); // a identifier thing
+  const testfile = splitId.join(".");
+  let runString = EffectiveRunner.executable_path;
+  if (EffectiveRunner.use_python_path) {
+    runString = folder + EffectiveRunner.executable_path;
+  }
+  console.log(`${runString} ${testfile}`);
+  let stdout = "";
+  try {
+    const res = await execPromise(`${runString} ${testfile}`, {
+      cwd: folder,
     });
-    controller.items.add(testItem);
+    stdout = res.stdout.trim();
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "stdout" in error) {
+      stdout = (error as { stdout: string }).stdout;
+    } else {
+      console.error(`Error running behave: ${error}`);
+      if (!testItem.error) {
+        testItem.error = `Error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`;
+      }
+      throw error;
+    }
+  }
+  const splitOutput = stdout.trim().split("\n");
+  const effectiveLine=splitOutput[splitOutput.length - 4];
+  const regex=/(\d+) features? passed, (\d+) failed, (\d+) skipped/;
+  const match = effectiveLine.match(regex);
+  const passed = match ? parseInt(match[1]) : 0;
+  const failed = match ? parseInt(match[2]) : 0;
+  const skipped = match ? parseInt(match[3]) : 0;
+  if (skipped+failed>0) {
+    throw new Error(
+      `Behave tests failed or skipped: ${failed} failed, ${skipped} skipped, ${passed} passed`
+    );
+  }
+  if (passed === 0) {
+    throw new Error("No tests passed");
   }
 }
 
 export async function runUnittest(
-  folder: string,
-  pythonPath: string,
-  file: string,
+  MonitorItemParent: Monitor,
+  EffectiveRunner: RunnerType,
   testItem: vscode.TestItem // Pass the test item to update its message
 ): Promise<void> {
-  console.log(`Full command: ${folder}${pythonPath} ${file}`);
+  const folder = MonitorItemParent.path;
+  const splitId = (testItem.id as string).split(".");
+  splitId.pop(); // a identifier thing
+  const testfile = splitId.join(".");
+  let runString = EffectiveRunner.executable_path;
+  if (EffectiveRunner.use_python_path) {
+    runString = folder + EffectiveRunner.executable_path;
+  }
+  console.log(`${runString} ${testfile}`);
   try {
-    const res = await execPromise(`${folder}${pythonPath} ${file}`, {
-      cwd: folder    
+    const res = await execPromise(`${runString} ${testfile}`, {
+      cwd: folder,
     });
-
-    // Check exit code first (execPromise throws on non-zero exit codes)
-    // Only set error if there are actual test failures
     const stdoutOutput = res.stderr.trim().split("\n").pop();
     if (!stdoutOutput?.startsWith("OK")) {
       testItem.error = res.stderr.trim() || stdoutOutput;
@@ -192,9 +298,6 @@ export async function runUnittest(
     }
   } catch (error) {
     console.error(`Error running unittest: ${error}`);
-    if (!testItem.error) {
-      testItem.error = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
-    }
     throw error;
   }
 }
