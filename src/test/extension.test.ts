@@ -9,60 +9,64 @@ jest.mock("../process/zipper");
 // Mock TestRunProfileKind for tests
 (vscode as any).TestRunProfileKind = { Run: "run" };
 
-describe("VSCode Extension", () => {
-  beforeEach(() => {
-    jest.resetAllMocks();
-    
-    // Mock workspace configuration
-    (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
-      get: jest
-        .fn()
-        .mockImplementationOnce(() => [
-          {
-            path: "/my/project/",
-            test_files: ["tests/test1.py", "tests/test2.py"],
-            python_path: "/env/bin/python",
-            evidence_collector: ["/collector"],
-          },
-        ])
-        .mockImplementationOnce(() => "C:\\evidence"),
-    });
+function mockWorkspaceConfig() {
+  (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+    get: jest
+      .fn()
+      .mockImplementationOnce(() => [
+        {
+          path: "/my/project/",
+          test_files: ["tests/test1.py", "tests/test2.py"],
+          python_path: "/env/bin/python",
+          evidence_collector: ["/collector"],
+        },
+      ])
+      .mockImplementationOnce(() => "C:\\evidence"),
+  });
+}
 
-    // Reset vscode tests mocks
-    (vscode.tests.createTestController as jest.Mock).mockImplementation(
-      (id, label) => ({
-        id,
-        label,
-        createRunProfile: jest.fn(() => ({
-          run: jest.fn(),
-        })),
-        createTestRun: jest.fn(() => ({
-          started: jest.fn(),
-          passed: jest.fn(),
-          failed: jest.fn(),
-          end: jest.fn(),
-        })),
-        createTestItem: jest.fn((itemId, itemLabel) => ({
-          id: itemId,
-          label: itemLabel,
+function mockTestController() {
+  (vscode.tests.createTestController as jest.Mock).mockImplementation(
+    (id, label) => ({
+      id,
+      label,
+      createRunProfile: jest.fn(() => ({
+        run: jest.fn(),
+      })),
+      createTestRun: jest.fn(() => ({
+        started: jest.fn(),
+        passed: jest.fn(),
+        failed: jest.fn(),
+        end: jest.fn(),
+      })),
+      createTestItem: jest.fn((itemId, itemLabel) => ({
+        id: itemId,
+        label: itemLabel,
+        children: {
+          add: jest.fn(),
+          get: jest.fn(),
+        },
+      })),
+      items: {
+        add: jest.fn((id, label) => ({
+          id,
+          label,
           children: {
             add: jest.fn(),
             get: jest.fn(),
           },
         })),
-        items: {
-          add: jest.fn((id, label) => ({
-            id,
-            label,
-            children: {
-              add: jest.fn(),
-              get: jest.fn(),
-            },
-          })),
-          replace: jest.fn(),
-        },
-      })
-    );
+        replace: jest.fn(),
+      },
+    })
+  );
+}
+
+describe("VSCode Extension", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockWorkspaceConfig();
+    mockTestController();
   });
 
   test("activate registers test controller and run profile", () => {
